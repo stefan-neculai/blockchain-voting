@@ -1,0 +1,27 @@
+.poll-card {
+  background-color: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.poll-content h2 {
+  margin-top: 0;
+  font-size: 1.25rem;
+}
+
+.poll-content p {
+  color: #555;
+  line-height: 1.6;
+}
+
+.poll-actions-container {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 2rem;
+}

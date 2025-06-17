@@ -1,0 +1,46 @@
+.voting-interface {
+  flex-grow: 1;
+}
+
+.vote-buttons {
+  display: flex;
+  gap: 1rem;
+}
+
+.vote-buttons button {
+  padding: 0.8rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.vote-buttons button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.vote-buttons button:first-child {
+  background-color: #28a745; /* Green */
+  color: white;
+}
+.vote-buttons button:first-child:hover:not(:disabled) {
+  background-color: #218838;
+}
+
+.vote-no {
+  background-color: #dc3545; /* Red */
+  color: white;
+}
+.vote-no:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
+.feedback-text {
+  margin-top: 1rem;
+  font-style: italic;
+  color: #333;
+  min-height: 24px; /* Reserve space to prevent layout shift */
+}

@@ -1,0 +1,16 @@
+.polls-container {
+  padding: 2rem;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.polls-container h1 {
+  border-bottom: 2px solid #eee;
+  padding-bottom: 0.5rem;
+  margin-bottom: 2rem;
+}
+
+.polls-list {
+  display: grid;
+  gap: 2rem;
+}

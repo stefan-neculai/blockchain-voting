@@ -1,0 +1,12 @@
+{
+    "folders" : [
+        {
+            "path": "packages/hardhat",
+            "name": "hardhat"
+        },
+        {
+            "path": "react-app",
+            "name": "frontend"
+        }
+    ],
+}

@@ -1,0 +1,111 @@
+.create-poll-container {
+  max-width: 600px;
+  margin: 2rem auto;
+  padding: 2rem;
+  background-color: #1c1c1c;
+  border-radius: 8px;
+  border: 1px solid #333;
+}
+
+.create-poll-container h2 {
+  text-align: center;
+  margin-bottom: 2rem;
+  color: #fff;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #ccc;
+  font-weight: bold;
+}
+
+.form-group input[type="text"] {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #444;
+  background-color: #2a2a2a;
+  color: #fff;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.option-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.option-item input {
+  flex-grow: 1; /* Make input take up available space */
+}
+
+.remove-option-btn, .add-option-btn {
+  padding: 0.5rem 0.75rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.remove-option-btn {
+  background-color: #4a2c2c;
+  color: #ff8a8a;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+.remove-option-btn:disabled {
+  background-color: #333;
+  color: #666;
+  cursor: not-allowed;
+}
+
+.add-option-btn {
+  margin-top: 1rem;
+  background-color: #333;
+  color: #fff;
+}
+
+.submit-poll-btn {
+  width: 100%;
+  padding: 1rem;
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #fff;
+  background-color: #007bff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.submit-poll-btn:hover {
+  background-color: #0056b3;
+}
+
+.submit-poll-btn:disabled {
+  background-color: #555;
+  cursor: not-allowed;
+}
+
+.error-message {
+  color: #ff8a8a;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.connect-prompt {
+  text-align: center;
+  color: #ccc;
+  padding: 3rem 0;
+}
