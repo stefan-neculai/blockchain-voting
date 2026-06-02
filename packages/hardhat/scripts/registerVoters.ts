@@ -63,13 +63,13 @@ async function main() {
 
   // Connect to contract
   const AnonymousVoting = await ethers.getContractFactory("AnonymousVoting");
-  const voting = AnonymousVoting.attach(votingAddress);
+  const voting = AnonymousVoting.attach(votingAddress!) as any;
 
-  // Verify admin access
-  const contractAdmin = await voting.admin();
-  if (contractAdmin.toLowerCase() !== admin.address.toLowerCase()) {
+  // Verify poll creator access
+  const pollCreator = await voting.pollCreators(pollId);
+  if (pollCreator.toLowerCase() !== admin.address.toLowerCase()) {
     throw new Error(
-      `Signer ${admin.address} is not the admin. Contract admin is ${contractAdmin}`
+      `Signer ${admin.address} is not the creator of poll ${pollId}. Poll creator is ${pollCreator}`
     );
   }
 
@@ -207,7 +207,7 @@ async function createSamplePoll() {
 
   const [admin] = await ethers.getSigners();
   const AnonymousVoting = await ethers.getContractFactory("AnonymousVoting");
-  const voting = AnonymousVoting.attach(votingAddress);
+  const voting = AnonymousVoting.attach(votingAddress!) as any;
 
   console.log("Creating sample poll...");
   const tx = await voting.createPoll(

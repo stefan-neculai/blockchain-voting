@@ -3,9 +3,10 @@
  * @description Tests ZK proof generation and vote submission flow
  */
 
-import { renderHook, act, waitFor } from '@testing-library/react';
+/* global BigInt */
+
+import { renderHook, act } from '@testing-library/react';
 import { useAnonymousVoting, VotingState } from '../useAnonymousVoting';
-import React from 'react';
 
 // Mock Web3Context
 const mockProvider = {
@@ -177,10 +178,6 @@ describe('useAnonymousVoting Hook', () => {
       mockGetAnonymousVotingContract.mockResolvedValue(mockContract);
 
       const { result } = renderHook(() => useAnonymousVoting());
-      const states = [];
-
-      // Track state changes
-      const unsubscribe = result.current;
 
       await act(async () => {
         await result.current.vote('0xpollId', 0);

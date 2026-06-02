@@ -3,6 +3,8 @@
  * @description Handles proof generation and vote submission using Semaphore
  */
 
+/* global BigInt */
+
 import { useState, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { generateProof } from '@semaphore-protocol/proof';
@@ -40,7 +42,7 @@ export const VotingState = {
  * @returns {Object} Voting functions and state
  */
 export function useAnonymousVoting() {
-  const { provider, account, isConnected } = useWeb3();
+  const { provider, isConnected } = useWeb3();
   const { identity, hasIdentity, commitment } = useIdentity();
   
   // State

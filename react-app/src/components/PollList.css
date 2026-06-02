@@ -2,12 +2,17 @@
   max-width: 800px;
   margin: 2rem auto;
   padding: 2rem;
+  background: #1c1c1c;
+  border-radius: 12px;
+  border: 1px solid #333;
 }
 
 .poll-list-container h2 {
   text-align: center;
   margin-bottom: 2rem;
-  color: #fff;
+  color: #f8fafc;
+  font-size: 1.75rem;
+  font-weight: 600;
 }
 
 .polls-container {
@@ -58,10 +63,11 @@
 }
 
 .feedback-message a {
-  color: #61dafb;
+  color: #fff;
   text-decoration: none;
+  transition: color 0.2s;
 }
 
 .feedback-message a:hover {
-  text-decoration: underline;
+  color: #61dafb;
 }   

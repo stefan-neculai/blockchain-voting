@@ -1,1 +1,18 @@
 node_modules
+
+# Environment files with secrets - use .env.example instead
+.env.local
+.env.production
+packages/hardhat/.env
+
+# Hardhat cache & artifacts (generated)
+packages/hardhat/cache/
+packages/hardhat/artifacts/
+packages/hardhat/typechain-types/
+
+# Yarn/npm cache artifacts
+"packages/hardhat/-operator@7.18.6ï¿º"
+
+# Build output
+react-app/build/
+

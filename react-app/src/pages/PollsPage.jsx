@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import PollCard from '../components/PollCard';
-import { useUnsafeVoting } from '../hooks/useUnsafeVoting'; // Import the hook
+import { useWeb3 } from '../contexts/Web3Context';
 import './PollsPage.css';
 
 const PollsPage = () => {
@@ -9,27 +9,51 @@ const PollsPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Get the fetch function from our custom hook
-  const { fetchAllPolls } = useUnsafeVoting();
+  // Get the contract function from Web3Context
+  const { getAnonymousVotingContract, isConnected, provider } = useWeb3();
+
+  const fetchPolls = useCallback(async () => {
+    if (!isConnected || !provider) {
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const contract = await getAnonymousVotingContract(false); // Read-only
+      const pollCount = await contract.pollCount();
+      
+      const pollPromises = [];
+      for (let i = 0; i < pollCount; i++) {
+        pollPromises.push(contract.getPoll(i));
+      }
+      
+      const pollResults = await Promise.all(pollPromises);
+      const pollsData = pollResults.map((poll, index) => ({
+        id: index,
+        question: poll.question,
+        options: [...poll.options],
+        votes: poll.votes.map(v => Number(v)),
+        isActive: poll.isActive,
+        endTime: Number(poll.endTime),
+        totalVotes: Number(poll.totalVotes)
+      }));
+      
+      setPolls(pollsData);
+    } catch (err) {
+      setError("Failed to load polls from the blockchain.");
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [getAnonymousVotingContract, isConnected, provider]);
 
   // Use useEffect to fetch the data when the component mounts
   useEffect(() => {
-    const loadPolls = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const fetchedPolls = await fetchAllPolls();
-        setPolls(fetchedPolls);
-      } catch (err) {
-        setError("Failed to load polls from the blockchain.");
-        console.error(err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadPolls();
-  }, [fetchAllPolls]); // Dependency array ensures this runs once
+    fetchPolls();
+  }, [fetchPolls]);
 
   // --- Render logic based on state ---
 

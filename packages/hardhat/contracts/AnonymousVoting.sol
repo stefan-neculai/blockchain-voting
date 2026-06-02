@@ -14,6 +14,11 @@ import "./interfaces/ISemaphore.sol";
  * - No voter addresses stored on-chain
  * - Vote choice hidden via ZK proof signal
  * - Nullifier prevents double-voting without revealing identity
+ * 
+ * Decentralized Model:
+ * - No global admin - anyone can create polls
+ * - Each poll has its own creator who manages voter registration
+ * - Poll creators can only manage their own polls
  */
 contract AnonymousVoting {
     // =========================================================================
@@ -23,11 +28,11 @@ contract AnonymousVoting {
     /// @notice The Semaphore contract for group management and proof verification
     ISemaphore public immutable semaphore;
 
-    /// @notice Admin address with permission to create polls and register voters
-    address public admin;
-
     /// @notice Counter for generating unique poll IDs
     uint256 public pollCount;
+
+    /// @notice Mapping from poll ID to the address that created it
+    mapping(uint256 => address) public pollCreators;
 
     /// @notice Struct containing all poll data
     struct Poll {
@@ -81,17 +86,17 @@ contract AnonymousVoting {
         bool isActive
     );
 
-    /// @notice Emitted when admin is transferred
-    event AdminTransferred(
-        address indexed previousAdmin,
-        address indexed newAdmin
+    /// @notice Emitted when a poll creator is assigned
+    event PollCreatorAssigned(
+        uint256 indexed pollId,
+        address indexed creator
     );
 
     // =========================================================================
     // Errors
     // =========================================================================
 
-    error NotAdmin();
+    error NotPollCreator();
     error PollDoesNotExist();
     error PollNotActive();
     error PollEnded();
@@ -107,8 +112,8 @@ contract AnonymousVoting {
     // Modifiers
     // =========================================================================
 
-    modifier onlyAdmin() {
-        if (msg.sender != admin) revert NotAdmin();
+    modifier onlyPollCreator(uint256 _pollId) {
+        if (msg.sender != pollCreators[_pollId]) revert NotPollCreator();
         _;
     }
 
@@ -128,15 +133,15 @@ contract AnonymousVoting {
     constructor(address _semaphoreAddress) {
         if (_semaphoreAddress == address(0)) revert ZeroAddress();
         semaphore = ISemaphore(_semaphoreAddress);
-        admin = msg.sender;
     }
 
     // =========================================================================
-    // Admin Functions
+    // Poll Management Functions
     // =========================================================================
 
     /**
      * @notice Creates a new poll with its own Semaphore group
+     * @dev Anyone can create a poll. The caller becomes the poll creator.
      * @param _question The poll question or proposal text
      * @param _options Array of voting options (candidates, choices, etc.)
      * @param _duration Duration in seconds for how long voting is open
@@ -146,13 +151,16 @@ contract AnonymousVoting {
         string memory _question,
         string[] memory _options,
         uint256 _duration
-    ) external onlyAdmin returns (uint256 pollId) {
+    ) external returns (uint256 pollId) {
         if (_options.length == 0) revert NoOptionsProvided();
         if (_options.length < 2) revert TooFewOptions();
         if (_duration == 0) revert InvalidDuration();
 
         pollId = pollCount;
         pollCount++;
+
+        // Assign the caller as the creator of this poll
+        pollCreators[pollId] = msg.sender;
 
         // Create a Semaphore group for this poll's eligible voters
         // The group ID matches the poll ID for simplicity
@@ -169,18 +177,20 @@ contract AnonymousVoting {
         newPoll.endTime = block.timestamp + _duration;
         newPoll.totalVotes = 0;
 
+        emit PollCreatorAssigned(pollId, msg.sender);
         emit PollCreated(pollId, _question, _options.length, newPoll.endTime);
     }
 
     /**
      * @notice Registers a single voter by adding their identity commitment to the poll's group
+     * @dev Only the poll creator can register voters
      * @param _pollId The poll ID to register the voter for
      * @param _identityCommitment The voter's Semaphore identity commitment
      */
     function registerVoter(
         uint256 _pollId,
         uint256 _identityCommitment
-    ) external onlyAdmin pollExists(_pollId) {
+    ) external pollExists(_pollId) onlyPollCreator(_pollId) {
         Poll storage poll = polls[_pollId];
         if (!poll.isActive) revert PollNotActive();
         if (block.timestamp >= poll.endTime) revert PollEnded();
@@ -191,13 +201,14 @@ contract AnonymousVoting {
 
     /**
      * @notice Registers multiple voters in a single transaction (gas efficient)
+     * @dev Only the poll creator can register voters
      * @param _pollId The poll ID to register voters for
      * @param _identityCommitments Array of voter identity commitments
      */
     function registerVoters(
         uint256 _pollId,
         uint256[] calldata _identityCommitments
-    ) external onlyAdmin pollExists(_pollId) {
+    ) external pollExists(_pollId) onlyPollCreator(_pollId) {
         Poll storage poll = polls[_pollId];
         if (!poll.isActive) revert PollNotActive();
         if (block.timestamp >= poll.endTime) revert PollEnded();
@@ -208,25 +219,16 @@ contract AnonymousVoting {
 
     /**
      * @notice Toggles the active status of a poll
+     * @dev Only the poll creator can change the poll status
      * @param _pollId The poll ID to update
      * @param _isActive The new active status
      */
     function setPollActive(
         uint256 _pollId,
         bool _isActive
-    ) external onlyAdmin pollExists(_pollId) {
+    ) external pollExists(_pollId) onlyPollCreator(_pollId) {
         polls[_pollId].isActive = _isActive;
         emit PollStatusChanged(_pollId, _isActive);
-    }
-
-    /**
-     * @notice Transfers admin rights to a new address
-     * @param _newAdmin The address of the new admin
-     */
-    function transferAdmin(address _newAdmin) external onlyAdmin {
-        if (_newAdmin == address(0)) revert ZeroAddress();
-        emit AdminTransferred(admin, _newAdmin);
-        admin = _newAdmin;
     }
 
     // =========================================================================
@@ -250,33 +252,13 @@ contract AnonymousVoting {
         ISemaphore.SemaphoreProof calldata _proof
     ) external pollExists(_pollId) {
         Poll storage poll = polls[_pollId];
-
-        // Validate poll state
         if (!poll.isActive) revert PollNotActive();
         if (block.timestamp >= poll.endTime) revert PollEnded();
         if (_optionIndex >= poll.options.length) revert InvalidOption();
-
-        // The signal/message in the proof must match the vote choice
-        // This ensures the voter cannot lie about their vote after proof generation
         if (_proof.message != _optionIndex) revert SignalMismatch();
-
-        // The scope should match the poll ID to prevent proof reuse across polls
-        // Note: This is typically enforced at proof generation time
-        
-        // Verify the ZK proof via Semaphore
-        // This will:
-        // 1. Verify the cryptographic proof is valid
-        // 2. Check the voter is in the Merkle tree (eligible)
-        // 3. Store the nullifier (prevents double-voting)
-        // 4. Revert if nullifier was already used
         semaphore.validateProof(_pollId, _proof);
-
-        // Record the vote
         poll.votes[_optionIndex]++;
         poll.totalVotes++;
-
-        // Emit event with ONLY poll ID and option index
-        // The voter's identity is NOT revealed
         emit VoteCast(_pollId, _optionIndex);
     }
 
@@ -364,5 +346,14 @@ contract AnonymousVoting {
             return 0;
         }
         return polls[_pollId].endTime - block.timestamp;
+    }
+
+    /**
+     * @notice Get the creator address for a poll
+     * @param _pollId The poll ID
+     * @return The address of the poll creator
+     */
+    function getPollCreator(uint256 _pollId) external view pollExists(_pollId) returns (address) {
+        return pollCreators[_pollId];
     }
 }

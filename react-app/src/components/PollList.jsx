@@ -1,33 +1,52 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useWeb3 } from '../contexts/Web3Context';
 import './PollList.css'; // We will create this file
 
 const PollList = () => {
   const [polls, setPolls] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { getAnonymousVotingContract, isConnected, provider } = useWeb3();
 
   useEffect(() => {
     const fetchPolls = async () => {
+      if (!isConnected || !provider) {
+        setIsLoading(false);
+        return;
+      }
+
       try {
-        // This URL must match the port your backend server is running on
-        const response = await fetch('http://localhost:3001/polls');
-        if (!response.ok) {
-          throw new Error('Network response was not ok');
+        const contract = await getAnonymousVotingContract(false); // Read-only
+        const pollCount = await contract.pollCount();
+        
+        const pollPromises = [];
+        for (let i = 0; i < pollCount; i++) {
+          pollPromises.push(contract.getPoll(i));
         }
-        const data = await response.json();
-        console.log("Fetched polls:", data); // Debugging line to check fetched data
-        setPolls(data);
+        
+        const pollResults = await Promise.all(pollPromises);
+        const pollsData = pollResults.map((poll, index) => ({
+          id: index,
+          question: poll.question,
+          options: poll.options,
+          isActive: poll.isActive,
+          endTime: Number(poll.endTime),
+          totalVotes: Number(poll.totalVotes)
+        }));
+        
+        console.log("Fetched polls:", pollsData);
+        setPolls(pollsData);
       } catch (err) {
         console.error("Fetch error:", err);
-        setError('Failed to fetch polls. Is the backend server running?');
+        setError('Failed to fetch polls from blockchain.');
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchPolls();
-  }, []); // The empty array ensures this effect runs only once on mount
+  }, [isConnected, provider, getAnonymousVotingContract]);
 
   const renderContent = () => {
     if (isLoading) {
@@ -36,6 +55,14 @@ const PollList = () => {
 
     if (error) {
       return <div className="feedback-message error">{error}</div>;
+    }
+
+    if (!isConnected) {
+      return (
+        <div className="feedback-message">
+          Connect your wallet to view polls.
+        </div>
+      );
     }
 
     if (polls.length === 0) {

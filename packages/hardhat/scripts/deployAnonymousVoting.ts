@@ -78,11 +78,11 @@ async function main() {
 
   // Verify deployment
   console.log("Verifying deployment...");
-  const admin = await anonymousVoting.admin();
   const semaphoreFromContract = await anonymousVoting.semaphore();
-  console.log(`  Admin: ${admin}`);
+  console.log(`  Deployer: ${deployer.address}`);
   console.log(`  Semaphore: ${semaphoreFromContract}`);
-  console.log(`  Poll Count: ${await anonymousVoting.pollCount()}\n`);
+  console.log(`  Poll Count: ${await anonymousVoting.pollCount()}`);
+  console.log(`  Note: No global admin - anyone can create polls!\n`);
 
   // Save deployment info
   const deploymentInfo: DeploymentInfo = {

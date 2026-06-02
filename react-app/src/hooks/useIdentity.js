@@ -7,8 +7,18 @@ import { useState, useCallback, useEffect } from 'react';
 import { Identity } from '@semaphore-protocol/identity';
 import { useWeb3 } from '../contexts/Web3Context';
 
-// LocalStorage key for identity
-const IDENTITY_STORAGE_KEY = 'semaphore_identity_secret';
+// LocalStorage key prefix for identity (will be combined with account address)
+const IDENTITY_STORAGE_PREFIX = 'semaphore_identity_';
+
+/**
+ * Gets the storage key for a specific account
+ * @param {string} account - The wallet address
+ * @returns {string} The storage key
+ */
+const getStorageKey = (account) => {
+  if (!account) return null;
+  return `${IDENTITY_STORAGE_PREFIX}${account.toLowerCase()}`;
+};
 
 /**
  * Custom hook for managing Semaphore identity
@@ -24,27 +34,40 @@ export function useIdentity() {
   const [isInitialized, setIsInitialized] = useState(false);
   
   /**
-   * Loads existing identity from localStorage on mount
+   * Loads existing identity from localStorage when account changes
    */
   useEffect(() => {
     const loadStoredIdentity = () => {
+      // Reset identity when account changes
+      setIdentity(null);
+      setIsInitialized(false);
+      
+      if (!account) {
+        setIsInitialized(true);
+        return;
+      }
+      
       try {
-        const storedSecret = localStorage.getItem(IDENTITY_STORAGE_KEY);
+        const storageKey = getStorageKey(account);
+        const storedSecret = localStorage.getItem(storageKey);
         if (storedSecret) {
           const restoredIdentity = new Identity(storedSecret);
           setIdentity(restoredIdentity);
-          console.log("[Identity] Restored identity from storage");
+          console.log("[Identity] Restored identity for account:", account);
+        } else {
+          console.log("[Identity] No stored identity for account:", account);
         }
       } catch (err) {
         console.error("[Identity] Failed to restore identity:", err);
-        localStorage.removeItem(IDENTITY_STORAGE_KEY);
+        const storageKey = getStorageKey(account);
+        if (storageKey) localStorage.removeItem(storageKey);
       } finally {
         setIsInitialized(true);
       }
     };
     
     loadStoredIdentity();
-  }, []);
+  }, [account]); // Re-run when account changes
   
   /**
    * Creates a new identity by signing a message with MetaMask
@@ -72,11 +95,12 @@ export function useIdentity() {
       // Create identity from signature
       const newIdentity = new Identity(signature);
       
-      // Store the signature (secret) for recovery
-      localStorage.setItem(IDENTITY_STORAGE_KEY, signature);
+      // Store the signature (secret) for recovery - PER ACCOUNT
+      const storageKey = getStorageKey(account);
+      localStorage.setItem(storageKey, signature);
       
       setIdentity(newIdentity);
-      console.log("[Identity] Created new identity");
+      console.log("[Identity] Created new identity for account:", account);
       console.log("[Identity] Commitment:", newIdentity.commitment.toString());
       
       return newIdentity;
@@ -103,13 +127,16 @@ export function useIdentity() {
   }, [identity]);
   
   /**
-   * Clears the stored identity
+   * Clears the stored identity for the current account
    */
   const clearIdentity = useCallback(() => {
-    localStorage.removeItem(IDENTITY_STORAGE_KEY);
+    const storageKey = getStorageKey(account);
+    if (storageKey) {
+      localStorage.removeItem(storageKey);
+    }
     setIdentity(null);
-    console.log("[Identity] Identity cleared");
-  }, []);
+    console.log("[Identity] Identity cleared for account:", account);
+  }, [account]);
   
   /**
    * Gets the identity commitment (public identifier)
@@ -125,15 +152,17 @@ export function useIdentity() {
    * @returns {Object|null} Identity export data
    */
   const exportIdentity = useCallback(() => {
-    if (!identity) return null;
+    if (!identity || !account) return null;
     
-    const secret = localStorage.getItem(IDENTITY_STORAGE_KEY);
+    const storageKey = getStorageKey(account);
+    const secret = localStorage.getItem(storageKey);
     return {
       commitment: identity.commitment.toString(),
       secret: secret,
+      account: account,
       exportedAt: new Date().toISOString()
     };
-  }, [identity]);
+  }, [identity, account]);
   
   /**
    * Imports identity from backup data
@@ -141,17 +170,22 @@ export function useIdentity() {
    * @returns {Identity} The imported identity
    */
   const importIdentity = useCallback((secret) => {
+    if (!account) {
+      throw new Error("Please connect your wallet first");
+    }
+    
     try {
       const importedIdentity = new Identity(secret);
-      localStorage.setItem(IDENTITY_STORAGE_KEY, secret);
+      const storageKey = getStorageKey(account);
+      localStorage.setItem(storageKey, secret);
       setIdentity(importedIdentity);
-      console.log("[Identity] Imported identity successfully");
+      console.log("[Identity] Imported identity for account:", account);
       return importedIdentity;
     } catch (err) {
       console.error("[Identity] Failed to import identity:", err);
       throw new Error("Invalid identity secret");
     }
-  }, []);
+  }, [account]);
   
   return {
     // State

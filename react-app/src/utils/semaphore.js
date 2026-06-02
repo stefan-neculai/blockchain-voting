@@ -4,8 +4,9 @@
  *              and formatting proofs for the smart contract.
  */
 
+/* global BigInt */
+
 import { Group } from "@semaphore-protocol/group";
-import { ethers } from "ethers";
 
 // Cache for group members to reduce RPC calls
 const groupMembersCache = new Map();
@@ -39,11 +40,9 @@ export async function fetchGroupMembers(contract, pollId, useCache = true) {
   console.log(`[Semaphore] Fetching group members for poll ${pollId}...`);
   
   try {
-    // Query VoterRegistered events for this poll
+
     const filter = contract.filters.VoterRegistered(pollId);
     const events = await contract.queryFilter(filter);
-    
-    // Extract identity commitments from events
     const members = events.map(event => BigInt(event.args.identityCommitment));
     
     console.log(`[Semaphore] Found ${members.length} registered voters for poll ${pollId}`);
@@ -169,7 +168,7 @@ export function validateProofLocally(proof, expectedPollId, expectedOption) {
   return true;
 }
 
-export default {
+const semaphoreUtils = {
   fetchGroupMembers,
   buildGroup,
   formatProofForContract,
@@ -178,3 +177,5 @@ export default {
   clearCache,
   validateProofLocally
 };
+
+export default semaphoreUtils;

@@ -3,6 +3,8 @@
  * @description Tests identity generation, storage, export/import, and recovery
  */
 
+/* global BigInt */
+
 import { renderHook, act } from '@testing-library/react';
 import { useIdentity } from '../useIdentity';
 
@@ -60,7 +62,7 @@ describe('useIdentity Hook', () => {
         createdAt: Date.now(),
       }));
 
-      const { result } = renderHook(() => useIdentity());
+      renderHook(() => useIdentity());
 
       // Wait for useEffect to run
       expect(localStorageMock.getItem).toHaveBeenCalledWith('zkIdentity');

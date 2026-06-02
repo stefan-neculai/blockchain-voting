@@ -24,6 +24,7 @@ export const Web3Provider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [chainId, setChainId] = useState(null);
+  const [balance, setBalance] = useState(null);
 
   // --- Get legacy PollFactory contract ---
   const getContract = useCallback(async () => {
@@ -48,7 +49,65 @@ export const Web3Provider = ({ children }) => {
     return new ethers.Contract(ANONYMOUS_VOTING_ADDRESS, AnonymousVotingAbi.abi, provider);
   }, [provider]);
 
+  // --- Get the creator of a specific poll ---
+  const getPollCreator = useCallback(async (pollId) => {
+    const contract = await getAnonymousVotingContract(false);
+    if (!contract) return null;
+    try {
+      const creator = await contract.getPollCreator(pollId);
+      return creator;
+    } catch (err) {
+      console.error("Failed to get poll creator:", err);
+      return null;
+    }
+  }, [getAnonymousVotingContract]);
+
+  // --- Check if current account is the creator of a poll ---
+  const isPollCreator = useCallback(async (pollId) => {
+    if (!account) return false;
+    const creator = await getPollCreator(pollId);
+    if (!creator) return false;
+    return creator.toLowerCase() === account.toLowerCase();
+  }, [account, getPollCreator]);
+
+  // --- Register a single voter for a poll (only poll creator can call) ---
+  const registerVoterForPoll = useCallback(async (pollId, commitment) => {
+    const contract = await getAnonymousVotingContract(true);
+    if (!contract) throw new Error("Contract not available");
+    const tx = await contract.registerVoter(pollId, commitment);
+    await tx.wait();
+    return tx;
+  }, [getAnonymousVotingContract]);
+
+  // --- Register multiple voters for a poll (only poll creator can call) ---
+  const registerVotersForPoll = useCallback(async (pollId, commitments) => {
+    const contract = await getAnonymousVotingContract(true);
+    if (!contract) throw new Error("Contract not available");
+    const tx = await contract.registerVoters(pollId, commitments);
+    await tx.wait();
+    return tx;
+  }, [getAnonymousVotingContract]);
+
+  // --- Disconnect wallet ---
+  const disconnectWallet = useCallback(() => {
+    setAccount(null);
+    setProvider(null);
+    setSigner(null);
+    setChainId(null);
+    setError(null);
+    setBalance(null);
+    // Clear remembered connection preference
+    localStorage.removeItem('walletConnected');
+    console.log("Wallet disconnected");
+  }, []);
+
   const connectWallet = useCallback(async () => {
+    // Prevent duplicate requests
+    if (isLoading) {
+      console.log("Connection already in progress...");
+      return;
+    }
+    
     if (!window.ethereum) {
       setError("MetaMask is not installed.");
       return;
@@ -60,7 +119,13 @@ export const Web3Provider = ({ children }) => {
     try {
       const browserProvider = new ethers.BrowserProvider(window.ethereum);
       
-      // Request accounts
+      // Force MetaMask to show account picker dialog
+      await window.ethereum.request({
+        method: 'wallet_requestPermissions',
+        params: [{ eth_accounts: {} }],
+      });
+      
+      // Now get the selected account
       const accounts = await browserProvider.send("eth_requestAccounts", []);
       
       // Get network info
@@ -73,6 +138,15 @@ export const Web3Provider = ({ children }) => {
       setSigner(signerInstance);
       setAccount(accounts[0]);
       setChainId(Number(network.chainId));
+      
+      // Fetch account balance
+      const balanceWei = await browserProvider.getBalance(accounts[0]);
+      const formattedBalance = ethers.formatEther(balanceWei);
+      console.log("Balance fetched:", formattedBalance, "ETH");
+      setBalance(formattedBalance);
+      
+      // Remember that user connected
+      localStorage.setItem('walletConnected', 'true');
 
       console.log("Connected:", accounts[0], "on chain", network.chainId);
 
@@ -80,13 +154,49 @@ export const Web3Provider = ({ children }) => {
       console.error("Connection failed:", err);
       if (err.code === 4001) {
         setError("You rejected the connection request.");
+      } else if (err.code === -32002) {
+        setError("Please check MetaMask - a connection request is already pending.");
       } else {
         setError("An error occurred while connecting.");
       }
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isLoading]);
+
+  // Auto-reconnect on page load if previously connected
+  useEffect(() => {
+    const autoConnect = async () => {
+      const wasConnected = localStorage.getItem('walletConnected');
+      if (wasConnected === 'true' && window.ethereum && !account) {
+        try {
+          const browserProvider = new ethers.BrowserProvider(window.ethereum);
+          // Check if we already have permission (won't prompt)
+          const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+          
+          if (accounts.length > 0) {
+            const network = await browserProvider.getNetwork();
+            const signerInstance = await browserProvider.getSigner();
+            
+            setProvider(browserProvider);
+            setSigner(signerInstance);
+            setAccount(accounts[0]);
+            setChainId(Number(network.chainId));
+            
+            const balanceWei = await browserProvider.getBalance(accounts[0]);
+            setBalance(ethers.formatEther(balanceWei));
+            
+            console.log("Auto-reconnected:", accounts[0]);
+          }
+        } catch (err) {
+          console.log("Auto-reconnect failed:", err);
+          localStorage.removeItem('walletConnected');
+        }
+      }
+    };
+    
+    autoConnect();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Listen for account/chain changes
   useEffect(() => {
@@ -114,6 +224,18 @@ export const Web3Provider = ({ children }) => {
     }
   }, []);
 
+  // Refresh balance function
+  const refreshBalance = useCallback(async () => {
+    if (provider && account) {
+      try {
+        const balanceWei = await provider.getBalance(account);
+        setBalance(ethers.formatEther(balanceWei));
+      } catch (err) {
+        console.error('Failed to refresh balance:', err);
+      }
+    }
+  }, [provider, account]);
+
   const value = {
     account,
     provider,
@@ -121,10 +243,18 @@ export const Web3Provider = ({ children }) => {
     isLoading,
     error,
     chainId,
+    balance,
     isConnected: !!account,
     connectWallet,
+    disconnectWallet,
+    refreshBalance,
     getContract,  // Legacy
     getAnonymousVotingContract,  // New ZK voting
+    // Per-poll creator functions
+    getPollCreator,
+    isPollCreator,
+    registerVoterForPoll,
+    registerVotersForPoll,
   };
 
   return <Web3Context.Provider value={value}>{children}</Web3Context.Provider>;
